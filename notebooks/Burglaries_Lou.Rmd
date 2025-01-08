@@ -1,0 +1,153 @@
+---
+title: "Aggrivated Burglaries"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(sf)
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+burglaries <- read_csv("NSS_Projects/geospatial-r-Jorgen85Lex/data/burglaries_2023.csv")
+burglaries
+```
+
+```{r}
+dc <- st_read("NSS_Projects/geospatial-r-Jorgen85Lex/data/DC/DC.shp")
+dc
+```
+
+```{r}
+burglaries_geo <- st_as_sf(
+  burglaries |> drop_na(latitude),
+  coords = c('longitude', 'latitude'),
+  crs = st_crs(dc)
+)
+
+burglaries_geo
+```
+```{r}
+dc |> 
+  ggplot() +
+  geom_sf() +
+  geom_sf(data = burglaries_geo, size = 0.1)
+
+```
+
+```{r}
+burglaries_dc <- st_join(burglaries_geo, dc, join = st_within, left = FALSE)
+burglaries_dc
+```
+PART 2 --- 
+Now, merge in the census data. **Note:** Make sure that the final dataset contains all census tracts (there are some census tracts that had no burglaries).
+
+```{r}
+census <- read_csv("NSS_Projects/geospatial-r-Jorgen85Lex/data/census.csv")
+census$NAME <- gsub(", Davidson County, Tennessee", "", census$NAME)
+census$NAME <- gsub("^Census Tract ", "", census$NAME)
+census
+```
+```{r}
+merged_censusburg <- merge(census, burglaries_dc, by = "NAME")
+merged_censusburg
+```
+```{r}
+summary(merged_censusburg$population)
+```
+```{r}
+ggplot(merged_censusburg, aes(x=population, color = 'black'))+
+  geom_histogram(bins = 30)
+```
+
+```{r}
+summary(merged_censusburg$median_income)
+```
+```{r}
+negative_income <- merged_censusburg %>%
+  filter(median_income < 0)
+
+negative_income
+```
+
+
+
+```{r}
+ggplot(merged_censusburg, aes(x=median_income, color = 'black'))+
+  geom_histogram(bins = 5)
+```
+
+```{r}
+ ggplot(merged_censusburg, aes(x = victim_ethnicity)) +
+  geom_bar(fill = "blue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+ ggplot(merged_censusburg, aes(x = weapon_description)) +
+  geom_bar(fill = "blue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+ ggplot(merged_censusburg, aes(x = victim_description)) +
+  geom_bar(fill = "BLUE") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Aggregate the data by census tract. **Warning:** each incident can appear multiple times if there are multiple victims, so be sure that you aren't double-counting any incidents. 
+```{r}
+merged_censusburg |> 
+  count(incident_number)
+```
+
+
+```{r}
+summary_censusburg <- merged_censusburg |> 
+  group_by(NAMELSAD) |> 
+  summarise(
+    incidents = n_distinct(incident_number),
+    victims_count = sum(victim_number, na.rm = TRUE),
+    average_median_income = mean(median_income, na.rm = TRUE), 
+    total_pop = sum(population, na.rm = TRUE)
+  )
+
+summary_censusburg
+```
+
+Which census tract had the highest number of burglaries? Which census tract had the highest number of burglaries per 1000 residents? 
+```{r}
+burglaries_by_tract <- merged_censusburg |> 
+  group_by(NAMELSAD) |> 
+  summarise(num_burglaries = n())
+
+highest_burgs <- burglaries_by_tract |> 
+  filter(num_burglaries == max(num_burglaries))
+
+highest_burgs
+```
+
+
+```{r}
+highest_burgs_1000<- merged_censusburg |> 
+  group_by(NAMELSAD) |> 
+  summarise(
+    num_burglaries = n(), 
+    total_population = sum(population, na.rm = TRUE)
+  ) |> 
+  mutate(burglaries_per_1000 = (num_burglaries/total_population) * 1000)
+```
+
+
+```{r}
+highest_burglaries_per_1000 <- aggregated_burglaries_per_1000 %>%
+  filter(burglaries_per_1000 == max(burglaries_per_1000))
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
