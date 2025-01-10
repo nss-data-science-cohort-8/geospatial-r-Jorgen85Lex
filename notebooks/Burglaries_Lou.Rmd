@@ -60,19 +60,31 @@ merged_censusburg
 ```{r}
 summary(merged_censusburg$population)
 ```
-```{r}
-ggplot(merged_censusburg, aes(x=population, color = 'black'))+
-  geom_histogram(bins = 30)
-```
 
 ```{r}
 summary(merged_censusburg$median_income)
 ```
+
 ```{r}
 negative_income <- merged_censusburg %>%
   filter(median_income < 0)
 
 negative_income
+```
+
+```{r}
+merged_censusburg <- merged_censusburg[merged_censusburg$median_income >= 0, ]
+```
+
+
+
+```{r}
+ggplot(merged_censusburg, aes(x=population, color = 'black'))+
+  geom_histogram(bins = 30)
+```
+```{r}
+ggplot(merged_censusburg, aes(x=median_income, color = 'black'))+
+  geom_histogram(bins = 30)
 ```
 
 
@@ -135,15 +147,48 @@ highest_burgs_1000<- merged_censusburg |>
   group_by(NAMELSAD) |> 
   summarise(
     num_burglaries = n(), 
-    total_population = sum(population, na.rm = TRUE)
+    total_population = sum(population, na.rm = TRUE),
+    
   ) |> 
   mutate(burglaries_per_1000 = (num_burglaries/total_population) * 1000)
+
+highest_burgs_1000
 ```
 
 
 ```{r}
-highest_burglaries_per_1000 <- aggregated_burglaries_per_1000 %>%
+highest_burglaries_per_1000 <- highest_burgs_1000 %>%
   filter(burglaries_per_1000 == max(burglaries_per_1000))
+
+highest_burglaries_per_1000
+```
+
+
+Finally, look at the relationship between median income and number of aggravated burglaries per tract. How would you describe this relationship?
+
+```{r}
+summary_censusburg$average_median_income <- as.numeric(summary_censusburg$average_median_income)
+summary_censusburg$incidents <- as.numeric(summary_censusburg$incidents)
+```
+
+
+```{r}
+ggplot(summary_censusburg, aes(x = average_median_income, y = incidents)) +
+  geom_point() 
+  labs(title = "Relationship between Median Income and Aggravated Burglaries",
+       x = "Median Income",
+       y = "Number of Aggravated Burglaries")
+```
+### Bonus: Statistical Modeling
+
+Fit a Poisson regression model with target variable the rate of burglaries per census tract and with predictor the median income. Offset using the log of the population so that we are looking at the rate of burglaries per population instead of the number of burglaries. How can you interpret the meaning of the output? How do the estimates from the model compare to the observed data?
+
+```{r}
+burg_poisson <- glm(num_burglaries ~ average_median_income + offset(log(population)), 
+                    family = poisson, 
+                    data = summary_censusburg)
+
+summary(burg_poisson)
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
